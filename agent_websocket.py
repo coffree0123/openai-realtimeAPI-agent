@@ -61,9 +61,65 @@ class RealTimeAgent:
             "temperature": 0.6
         }
 
-        self.connect()
+    def listen(self):
+        '''Keep sending audio chunks to the server'''
+        import struct
+        import soundfile as sf
+        from gtts import gTTS
 
-    def connect(self):
+        def float_to_16bit_pcm(float32_array):
+            clipped = [max(-1.0, min(1.0, x)) for x in float32_array]
+            pcm16 = b''.join(struct.pack('<h', int(x * 32767)) for x in clipped)
+            return pcm16
+
+        def base64_encode_audio(float32_array):
+            pcm_bytes = float_to_16bit_pcm(float32_array)
+            encoded = base64.b64encode(pcm_bytes).decode('utf-8')
+            return encoded
+
+        tts = gTTS(text="請跟我說一個笑話", lang='zh-tw')
+        tts.save("speech.wav")
+
+        data, samplerate = sf.read("speech.wav", dtype='float32')
+        channel_data = data[:, 0] if data.ndim > 1 else data
+
+        base64_chunk = base64_encode_audio(channel_data)
+
+        # 將語音檔案編碼為 Base64
+        self.audio_handler.play_audio(base64.b64decode(base64_chunk))
+
+        logger.debug("Starting audio recording for user input")
+
+        self.send_event({
+            "type": "input_audio_buffer.append",
+            "audio": base64_chunk
+        })
+
+        self.audio_handler.start_recording()
+        try:
+            while True:
+                chunk = self.audio_handler.record_chunk()
+                if chunk:
+                    # Encode and send audio chunk
+                    base64_chunk = base64.b64encode(chunk).decode('utf-8')
+                    self.send_event({
+                        "type": "input_audio_buffer.append",
+                        "audio": base64_chunk
+                    })
+                else:
+                    break
+        except Exception as e:
+            logger.error(f"Error during audio recording: {e}")
+            self.audio_handler.stop_recording()
+            logger.debug("Audio recording stopped")
+    
+        finally:
+            # Stop recording even if an exception occurs
+            self.audio_handler.stop_recording()
+            logger.debug("Audio recording stopped")
+
+
+    def run(self):
         logger.info(f"Connecting to WebSocket: {self.url}")
         headers = {
             "Authorization": f"Bearer {self.api_key}",
@@ -75,6 +131,7 @@ class RealTimeAgent:
             on_open=self.on_open,
             on_message=self.on_message,
         )
+
         self.ws.run_forever()
 
     # To send a client event, serialize a dictionary to JSON
@@ -91,9 +148,14 @@ class RealTimeAgent:
         )
         logger.info(f"Session set up to:\n{self.session_config}")
 
+        # Start a separate thread to listen for audio input
+        processing_thread = threading.Thread(target=self.listen)
+        processing_thread.daemon = True
+        processing_thread.start()
+
         # Send a response.create event to initiate the conversation
-        self.send_event({"type": "response.create"})
-        logger.debug("Sent response.create to initiate conversation")
+        #self.send_event({"type": "response.create"})
+        #logger.debug("Sent response.create to initiate conversation")
 
     # Receiving messages will require parsing message payloads
     # from JSON
@@ -113,6 +175,16 @@ class RealTimeAgent:
                 self.audio_buffer = b''
             else:
                 logger.warning("No audio data to play")
+        elif event["type"] == "response.done":
+            logger.debug("Response generation completed")
+        elif event["type"] == "conversation.item.created":
+            logger.debug(f"Conversation item created: {event.get('item')}")
+        elif event["type"] == "input_audio_buffer.speech_started":
+            logger.debug("Speech started detected by server VAD")
+        elif event["type"] == "input_audio_buffer.speech_stopped":
+            logger.debug("Speech stopped detected by server VAD")
+        else:
+            logger.debug(f"Unhandled event type: {event['type']}")
     
 
     def send_event(self, event):
@@ -127,7 +199,7 @@ class RealTimeAgent:
 
 if __name__ == "__main__":
     INSTRUCTIONS = f"""
-    你是一名幽默溫和的中年人, 你會說中文和英文.
-    你會用非常低沉的語氣說話
+    你是一名幽默溫和的中年人, 你只會說中文.
     """
     agent = RealTimeAgent(INSTRUCTIONS)
+    agent.run()
