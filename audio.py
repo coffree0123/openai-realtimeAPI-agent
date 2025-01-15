@@ -81,6 +81,7 @@ class AudioHandler:
             stream.stop_stream()
             stream.close()
 
+        play()
         # Use a separate thread for playback to avoid blocking
-        playback_thread = threading.Thread(target=play)
-        playback_thread.start()
+        # playback_thread = threading.Thread(target=play)
+        # playback_thread.start()

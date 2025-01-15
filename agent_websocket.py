@@ -1,7 +1,6 @@
-import asyncio
+import time
 import websocket
 import json
-import pyaudio
 import base64
 import logging
 import os
@@ -12,7 +11,7 @@ from dotenv import load_dotenv
 from audio import AudioHandler
 load_dotenv()
 
-logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
+logging.basicConfig(filename='my_log.log', level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
 
@@ -63,38 +62,6 @@ class RealTimeAgent:
 
     def listen(self):
         '''Keep sending audio chunks to the server'''
-        import struct
-        import soundfile as sf
-        from gtts import gTTS
-
-        def float_to_16bit_pcm(float32_array):
-            clipped = [max(-1.0, min(1.0, x)) for x in float32_array]
-            pcm16 = b''.join(struct.pack('<h', int(x * 32767)) for x in clipped)
-            return pcm16
-
-        def base64_encode_audio(float32_array):
-            pcm_bytes = float_to_16bit_pcm(float32_array)
-            encoded = base64.b64encode(pcm_bytes).decode('utf-8')
-            return encoded
-
-        tts = gTTS(text="請跟我說一個笑話", lang='zh-tw')
-        tts.save("speech.wav")
-
-        data, samplerate = sf.read("speech.wav", dtype='float32')
-        channel_data = data[:, 0] if data.ndim > 1 else data
-
-        base64_chunk = base64_encode_audio(channel_data)
-
-        # 將語音檔案編碼為 Base64
-        self.audio_handler.play_audio(base64.b64decode(base64_chunk))
-
-        logger.debug("Starting audio recording for user input")
-
-        self.send_event({
-            "type": "input_audio_buffer.append",
-            "audio": base64_chunk
-        })
-
         self.audio_handler.start_recording()
         try:
             while True:
@@ -153,10 +120,6 @@ class RealTimeAgent:
         processing_thread.daemon = True
         processing_thread.start()
 
-        # Send a response.create event to initiate the conversation
-        #self.send_event({"type": "response.create"})
-        #logger.debug("Sent response.create to initiate conversation")
-
     # Receiving messages will require parsing message payloads
     # from JSON
     def on_message(self, ws, message):
@@ -167,14 +130,18 @@ class RealTimeAgent:
             # Append audio data to buffer
             audio_data = base64.b64decode(event["delta"])
             self.audio_buffer += audio_data
-        elif event["type"] == "response.audio.done":
-            # Play the complete audio response
-            if self.audio_buffer:
+            if len(self.audio_buffer) > 50000:
                 self.audio_handler.play_audio(self.audio_buffer)
-                logger.info("Done playing audio response")
                 self.audio_buffer = b''
-            else:
-                logger.warning("No audio data to play")
+        elif event["type"] == "response.audio.done":
+            pass
+            # Play the complete audio response
+            # if self.audio_buffer:
+            #     self.audio_handler.play_audio(self.audio_buffer)
+            #     logger.info("Done playing audio response")
+            #     self.audio_buffer = b''
+            # else:
+            #     logger.warning("No audio data to play")
         elif event["type"] == "response.done":
             logger.debug("Response generation completed")
         elif event["type"] == "conversation.item.created":
@@ -199,7 +166,7 @@ class RealTimeAgent:
 
 if __name__ == "__main__":
     INSTRUCTIONS = f"""
-    你是一名幽默溫和的中年人, 你只會說中文.
+    你是一名幽默溫和的聊天機器人, 但你只會說中文.
     """
     agent = RealTimeAgent(INSTRUCTIONS)
     agent.run()
