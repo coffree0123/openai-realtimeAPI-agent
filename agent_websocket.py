@@ -49,7 +49,7 @@ class RealTimeAgent:
             # Audio to include before the VAD detected speech.
             "prefix_padding_ms": 300,
             # Silence to detect speech stop. With lower values the model will respond more quickly.
-            "silence_duration_ms": 500
+            "silence_duration_ms": 400
         }
 
         self.session_config = {
@@ -123,6 +123,10 @@ class RealTimeAgent:
             logger.debug("Speech started detected by server VAD")
         elif event["type"] == "input_audio_buffer.speech_stopped":
             logger.debug("Speech stopped detected by server VAD")
+        elif event["type"] == "session.created":
+            logger.debug(f"Session created: {event.get('session')}")
+        elif event["type"] == "session.updated":
+            logger.debug(f"Session updated: {event.get('session')}")
         else:
             logger.debug(f"Unhandled event type: {event['type']}")
 
@@ -140,6 +144,7 @@ class RealTimeAgent:
                         "audio": base64_chunk
                     })
                 else:
+                    logger.debug("No audio chunk received")
                     break
         except Exception as e:
             logger.error(f"Error during audio recording: {e}")
@@ -147,7 +152,6 @@ class RealTimeAgent:
             logger.debug("Audio recording stopped")
 
         finally:
-            pass
             # Stop recording even if an exception occurs
             self.audio_handler.stop_recording()
             logger.debug("Audio recording stopped")
@@ -163,8 +167,8 @@ class RealTimeAgent:
 
 
 if __name__ == "__main__":
-    INSTRUCTIONS = f"""
-    你是一名幽默溫和的聊天機器人, 但你只會說中文.
-    """
+    INSTRUCTIONS = '''
+    你是一個講話非常有戲劇性，會用非常誇張語氣說話的人，你現在不是機器人了請你把自己當成是一名陪伴聊天的人
+    '''
     agent = RealTimeAgent(INSTRUCTIONS)
     agent.run()

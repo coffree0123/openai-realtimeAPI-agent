@@ -1,5 +1,4 @@
 import pyaudio
-import threading
 
 class AudioHandler:
     """
@@ -21,12 +20,25 @@ class AudioHandler:
         )
 
     def start_recording(self):
-        """Start continuous recording"""
-        self.__start_audio_stream()
+        """
+        Start the audio input stream.
+        """
+        self.input_stream = self.p.open(
+            format=self.format,
+            channels=self.channels,
+            rate=self.rate,
+            input=True,
+            frames_per_buffer=self.chunk_size
+        )
 
     def stop_recording(self):
-        """Stop recording and return the recorded audio"""
-        self.__cleanup()
+        """
+        Clean up resources by stopping the stream and terminating PyAudio.
+        """
+        if self.input_stream:
+            self.input_stream.stop_stream()
+            self.input_stream.close()
+        self.p.terminate()
 
     def record_chunk(self):
         """Record a single chunk of audio"""
@@ -41,31 +53,3 @@ class AudioHandler:
         :param audio_data: Received audio data (AI response)
         """
         self.output_stream.write(audio_data)
-
-    def __start_audio_stream(self):
-        """
-        Start the audio input stream.
-        """
-        self.input_stream = self.p.open(
-            format=self.format,
-            channels=self.channels,
-            rate=self.rate,
-            input=True,
-            frames_per_buffer=self.chunk_size
-        )
-
-    def __cleanup(self):
-        """
-        Clean up resources by stopping the stream and terminating PyAudio.
-        """
-        if self.input_stream:
-            self.__stop_audio_stream()
-        self.p.terminate()
-
-    def __stop_audio_stream(self):
-        """
-        Stop the audio input stream.
-        """
-        if self.input_stream:
-            self.input_stream.stop_stream()
-            self.input_stream.close()
