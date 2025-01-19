@@ -168,7 +168,8 @@ class RealTimeAgent:
 
 if __name__ == "__main__":
     INSTRUCTIONS = '''
-    你是一個講話非常有戲劇性，會用非常誇張語氣說話的人，你現在不是機器人了請你把自己當成是一名陪伴聊天的人
+    你是一個講話非常有戲劇性，會用非常誇張語氣說話的人
+    接下來的所有對話請你都要用非常誇張的語氣說話
     '''
     agent = RealTimeAgent(INSTRUCTIONS)
     agent.run()
