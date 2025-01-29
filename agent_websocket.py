@@ -95,12 +95,13 @@ class RealTimeAgent:
         logger.info(f"Session set up to:\n{self.session_config}")
 
         # Start a separate thread to listen for audio input
-        processing_thread = threading.Thread(target=self.__listen)
-        processing_thread.daemon = True
-        processing_thread.start()
+        self.processing_thread = threading.Thread(target=self.__listen)
+        self.processing_thread.daemon = True
+        self.processing_thread.start()
+        self.listen_event = threading.Event()
+        self.listen_event.set()
 
-    # Receiving messages will require parsing message payloads
-    # from JSON
+    # Receiving messages will require parsing message payloads from JSON
     def __on_message(self, ws, message):
         event = json.loads(message)
         # logger.info(f"Received event: {json.dumps(event, indent=2)}")
@@ -108,13 +109,10 @@ class RealTimeAgent:
             # Append audio data to buffer
             audio_data = base64.b64decode(event["delta"])
             self.audio_handler.play_audio(audio_data)
-            # self.audio_buffer += audio_data
-            # if len(self.audio_buffer) > 50000:
-            #     logger.debug("Playing audio response")
-            #     self.audio_handler.play_audio(self.audio_buffer)
-            #     self.audio_buffer = b''
         elif event["type"] == "response.audio.done":
-            logger.info("Done playing audio response")
+            logger.info("Done playing audio response and starting to listen for audio input again")
+            # Start to listen for audio input again
+            self.listen_event.set()
         elif event["type"] == "response.done":
             logger.debug("Response generation completed")
         elif event["type"] == "conversation.item.created":
@@ -123,18 +121,21 @@ class RealTimeAgent:
             logger.debug("Speech started detected by server VAD")
         elif event["type"] == "input_audio_buffer.speech_stopped":
             logger.debug("Speech stopped detected by server VAD")
+            # Stop listening for audio input
+            self.listen_event.clear()
         elif event["type"] == "session.created":
             logger.debug(f"Session created: {event.get('session')}")
         elif event["type"] == "session.updated":
             logger.debug(f"Session updated: {event.get('session')}")
-        else:
-            logger.debug(f"Unhandled event type: {event['type']}")
+        # else:
+        #     logger.debug(f"Unhandled event type: {event['type']}")
 
     def __listen(self):
         '''Keep sending audio chunks to the server'''
         self.audio_handler.start_recording()
         try:
             while True:
+                self.listen_event.wait()
                 chunk = self.audio_handler.record_chunk()
                 if chunk:
                     # Encode and send audio chunk
