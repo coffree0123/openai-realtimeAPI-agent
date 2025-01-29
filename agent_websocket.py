@@ -76,9 +76,13 @@ class RealTimeAgent:
             header=headers,
             on_open=self.__on_open,
             on_message=self.__on_message,
+            on_error=self.__on_error,
         )
 
-        self.ws.run_forever()
+        try:
+            self.ws.run_forever()
+        except Exception as e:
+            logger.error(f"WebSocket connection error: {e}")
 
     # To send a client event, serialize a dictionary to JSON
     # of the proper event type
@@ -130,6 +134,9 @@ class RealTimeAgent:
         else:
             logger.debug(f"Unhandled event type: {event['type']}")
 
+    def __on_error(self, ws, error):
+        logger.error(f"WebSocket error: {error}")
+    
     def __listen(self):
         '''Keep sending audio chunks to the server'''
         self.audio_handler.start_recording()
