@@ -127,8 +127,8 @@ class RealTimeAgent:
             logger.debug(f"Session created: {event.get('session')}")
         elif event["type"] == "session.updated":
             logger.debug(f"Session updated: {event.get('session')}")
-        # else:
-        #     logger.debug(f"Unhandled event type: {event['type']}")
+        else:
+            logger.debug(f"Unhandled event type: {event['type']}")
 
     def __listen(self):
         '''Keep sending audio chunks to the server'''
