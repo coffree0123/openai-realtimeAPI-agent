@@ -110,11 +110,11 @@ class RealTimeAgent:
             audio_data = base64.b64decode(event["delta"])
             self.audio_handler.play_audio(audio_data)
         elif event["type"] == "response.audio.done":
-            logger.info("Done playing audio response and starting to listen for audio input again")
+            logger.info("Done playing audio response")
+        elif event["type"] == "response.done":
+            logger.debug("Response generation completed and starting to listen for audio input again")
             # Start to listen for audio input again
             self.listen_event.set()
-        elif event["type"] == "response.done":
-            logger.debug("Response generation completed")
         elif event["type"] == "conversation.item.created":
             logger.debug(f"Conversation item created: {event.get('item')}")
         elif event["type"] == "input_audio_buffer.speech_started":
